@@ -9,7 +9,7 @@
 
       const events = [];
       const movement = [];
-      let tracking = false;
+      let sampleCounter = 0;
       let lastPoint;
       let lastSampleTime;
 
@@ -21,27 +21,7 @@
         document.querySelector("#stats").textContent = `${events.length} samples | ${events.filter((event) => event.alert).length} alerts`;
       };
 
-      const startTracking = () => {
-        tracking = true;
-        movement.length = 0;
-        lastPoint = null;
-        lastSampleTime = null;
-        document.querySelector("#start-tracking").disabled = true;
-        document.querySelector("#stop-tracking").disabled = false;
-        document.querySelector("#status").textContent = "Tracking pointer movement. Move the mouse through the analysis area.";
-      };
-
-      const stopTracking = () => {
-        tracking = false;
-        lastPoint = null;
-        lastSampleTime = null;
-        document.querySelector("#start-tracking").disabled = false;
-        document.querySelector("#stop-tracking").disabled = true;
-        document.querySelector("#status").textContent = "Pointer tracking stopped.";
-      };
-
       const recordMovement = (event) => {
-        if (!tracking) return;
         const now = performance.now();
         if (!lastPoint || now - lastSampleTime < 40) {
           lastPoint = { x: event.clientX, y: event.clientY };
@@ -52,9 +32,11 @@
         const seconds = (now - lastSampleTime) / 1000;
         movement.push({ distance, speed: distance / Math.max(seconds, 0.001) });
         if (movement.length > 120) movement.shift();
+        sampleCounter += 1;
         lastPoint = { x: event.clientX, y: event.clientY };
         lastSampleTime = now;
         updateMetrics();
+        if (sampleCounter >= 3) recordSessionSample();
       };
 
       const updateMetrics = () => {
@@ -72,32 +54,35 @@
         document.querySelector("#alert").textContent = score >= threshold ? `ALERT: movement score crossed ${threshold}%` : "Movement within expected range";
       };
 
-      const analyze = () => {
-        if (!movement.length) {
-          document.querySelector("#status").textContent = "Move the pointer while tracking before recording a sample.";
-          return;
-        }
+      const recordSessionSample = () => {
         const scoreText = document.querySelector("#result").textContent.match(/[0-9.]+/);
         const score = scoreText ? Number(scoreText[0]) : 0;
+        const metrics = document.querySelector("#scores").textContent;
+        const speed = metrics.match(/Speed: ([0-9.]+ px\/s)/)?.[1] || "0.0 px/s";
+        const jitter = metrics.match(/Jitter: ([0-9.]+%)/)?.[1] || "0.0%";
         const alert = score >= Number(document.querySelector("#threshold").value);
-        const speeds = movement.map((sample) => sample.speed);
-        const averageSpeed = speeds.reduce((sum, value) => sum + value, 0) / speeds.length;
-        const jitterText = document.querySelector("#scores").textContent.match(/Jitter: ([0-9.]+)/);
-        events.unshift({ time: new Date().toLocaleTimeString(), score: `${score.toFixed(1)}%`, speed: `${averageSpeed.toFixed(1)} px/s`, jitter: `${jitterText ? jitterText[1] : "0.0"}%`, alert });
+        events.unshift({
+          time: new Date().toLocaleTimeString(),
+          score: `${score.toFixed(1)}%`,
+          speed,
+          jitter,
+          alert,
+        });
+        sampleCounter = 0;
         renderLog();
-        document.querySelector("#status").textContent = "Pointer sample recorded.";
+        document.querySelector("#status").textContent = "Movement sample saved to the session log.";
       };
 
       const resetSession = () => {
-        stopTracking();
         movement.length = 0;
         events.length = 0;
+        sampleCounter = 0;
         document.querySelector("#threshold").value = "70";
         document.querySelector("#threshold-value").value = "70";
         document.querySelector("#result").textContent = "Waiting for pointer input";
         document.querySelector("#scores").textContent = "No movement sample yet";
         document.querySelector("#alert").textContent = "No alert";
-        document.querySelector("#status").textContent = "Session reset. Start tracking to begin.";
+        document.querySelector("#status").textContent = "Session reset. Move the pointer to begin a new sample.";
         renderLog();
       };
 
@@ -109,12 +94,9 @@
       };
 
       window.addEventListener("DOMContentLoaded", () => {
-        document.querySelector("#start-tracking").addEventListener("click", startTracking);
-        document.querySelector("#stop-tracking").addEventListener("click", stopTracking);
-        document.querySelector("#analyze").addEventListener("click", analyze);
         document.querySelector("#reset").addEventListener("click", resetSession);
         document.querySelector("#download").addEventListener("click", download);
-        document.addEventListener("pointermove", recordMovement);
+        document.querySelector(".pointer-pad").addEventListener("pointermove", recordMovement);
       });
     </script>
     <style>
@@ -204,6 +186,9 @@
       button:disabled { cursor: wait; opacity: 0.6; }
       .button-row { display: flex; gap: 10px; }
       .button-row button { flex: 1; }
+      .analysis-controls #status,
+      .analysis-controls .sample-note,
+      .analysis-controls .metric { font-size: 0.8rem; }
       .metric { margin: 16px 0 0; font-weight: 700; }
       .scroll { overflow-x: auto; }
       table { width: 100%; margin-top: 16px; border-collapse: collapse; font-size: 0.85rem; }
@@ -227,16 +212,14 @@
       <section class="tool" aria-label="Pointer movement analyzer">
         <div class="analysis-layout">
           <div class="analysis-controls">
-            <div class="pointer-pad">Move your pointer through this page while tracking is active.</div>
+            <div class="pointer-pad">Move your pointer inside this area. Only movement here is counted.</div>
             <div class="button-row">
-              <button id="start-tracking" type="button">Start tracking</button>
-              <button id="stop-tracking" type="button" disabled>Stop tracking</button>
-              <button id="analyze" type="button">Record sample</button>
               <button id="reset" type="button">Reset session</button>
             </div>
             <label for="threshold">Anomaly alert threshold: <output id="threshold-value">70</output>%</label>
             <input id="threshold" type="range" min="50" max="99" value="70" oninput="document.querySelector('#threshold-value').value = this.value">
-            <p id="status" role="status">Start tracking to begin collecting pointer movement.</p>
+            <p id="status" role="status">Move the pointer to begin collecting movement.</p>
+            <p class="sample-note">Every 3 pointer movements are saved as one session-log sample.</p>
             <p class="metric">Result: <span id="result">Waiting for pointer input</span></p>
             <p class="metric">Metrics: <span id="scores">No movement sample yet</span></p>
             <p class="metric" id="alert">No alert</p>
