@@ -16,6 +16,9 @@ A Gradio app that takes typed text input, runs sentiment classification in Pytho
 
 Set this after creating the Space:
 - Hugging Face Space: https://huggingface.co/spaces/<your-username>/<your-space-name>
+- GitHub Pages project page: https://deqmin.github.io/Task_AI/
+
+GitHub Pages hosts the static project landing page. The Python Gradio model demo runs on Hugging Face Spaces.
 
 ## What this app does
 
