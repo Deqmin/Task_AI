@@ -1,5 +1,5 @@
 ---
-title: Live Sentiment Stream Analyzer
+title: Live Vision Object Detector
 emoji: "📈"
 colorFrom: blue
 colorTo: green
@@ -8,9 +8,9 @@ app_file: index.html
 pinned: false
 ---
 
-# Live Sentiment Stream Analyzer
+# Live Vision Object Detector
 
-A browser app that takes typed text input, runs the DistilBERT sentiment model with Transformers.js, and shows confidence scores, alerts, and an exportable event log.
+A browser app that captures webcam frames, runs object detection with DETR through Transformers.js, draws bounding boxes and confidence scores, and keeps an exportable detection log.
 
 ## Live demo URL
 
@@ -22,31 +22,31 @@ The static app runs on GitHub Pages or a free Hugging Face Static Space. The Pyt
 
 ## What this app does
 
-- Accepts text input from the user and analyzes each submitted sample.
-- Uses the DistilBERT sentiment model in the browser through Transformers.js.
-- Displays confidence scores for each class.
-- Triggers a visible alert when confidence crosses a user-defined threshold.
-- Stores a session event log with timestamps and lets users export CSV/JSON.
+- Requests webcam access and analyzes one captured frame at a time.
+- Uses `Xenova/detr-resnet-50` in the browser through Transformers.js.
+- Draws detected object boxes and confidence labels over the camera frame.
+- Filters detections with a user-controlled minimum confidence.
+- Stores a timestamped detection log and lets users export JSON.
 
 ## Model and data
 
-- Model: `distilbert-base-uncased-finetuned-sst-2-english`
+- Model: `Xenova/detr-resnet-50`
 - Source: Hugging Face model hub
-- Input data: user-provided text only (no uploaded dataset)
+- Input data: webcam frames only; frames are processed in the browser.
 
 ## How it works
 
-1. User enters text in the UI.
-2. Transformers.js downloads the tokenizer and model in the browser and runs text classification locally.
-3. App sorts class probabilities and shows top class + confidence.
-4. If confidence is above threshold (and matches target class), an alert banner appears.
-5. Analysis events are appended to an in-memory session log and can be downloaded as CSV/JSON.
+1. User grants camera permission and starts the webcam.
+2. Transformers.js downloads the DETR model and runs object detection locally in the browser.
+3. Detected objects are drawn with bounding boxes and confidence scores.
+4. The minimum-confidence control filters low-confidence detections.
+5. Detection events are appended to an in-memory log and can be downloaded as JSON.
 
 ## Limitations
 
-- Binary sentiment only (Positive/Negative), not nuanced emotions.
-- Can misinterpret sarcasm, slang, mixed languages, and very short snippets.
-- Confidence is not calibrated certainty; it is model probability for this task.
+- Camera permission is required; if access is denied, the UI shows an actionable error.
+- Browser model downloads require network access and may be slow on first use.
+- Detection confidence is not calibrated certainty and small or occluded objects may be missed.
 
 ## Local run
 
