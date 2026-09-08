@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Live Sentiment Stream Analyzer</title>
+    <title>Live Sentiment Stream Analyzer - Text/Keyboard</title>
     <script type="module">
       import { pipeline } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1";
 
@@ -71,9 +71,22 @@
         URL.revokeObjectURL(link.href);
       };
 
+      const resetSession = () => {
+        events.length = 0;
+        document.querySelector("#text-input").value = "";
+        document.querySelector("#threshold").value = "80";
+        document.querySelector("#threshold-value").value = "80";
+        document.querySelector("#result").textContent = "Waiting for input";
+        document.querySelector("#scores").textContent = "No analysis yet";
+        document.querySelector("#alert").textContent = "No alert";
+        document.querySelector("#status").textContent = "Session reset. The model downloads on the first analysis.";
+        renderLog();
+      };
+
       window.addEventListener("DOMContentLoaded", () => {
         document.querySelector("#analyze").addEventListener("click", analyze);
         document.querySelector("#download").addEventListener("click", download);
+        document.querySelector("#reset").addEventListener("click", resetSession);
       });
     </script>
     <style>
@@ -93,7 +106,7 @@
       }
 
       main {
-        width: min(680px, calc(100% - 40px));
+        width: min(1120px, calc(100% - 56px));
         padding: 48px 0;
       }
 
@@ -145,6 +158,9 @@
         font-family: system-ui, sans-serif;
       }
 
+      .analysis-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 1fr); gap: 24px; align-items: stretch; }
+      .event-log { min-width: 0; min-height: 100%; padding-left: 24px; border-left: 1px solid #b6c7bf; }
+
       textarea, input, button {
         box-sizing: border-box;
         width: 100%;
@@ -157,33 +173,50 @@
 
       button { cursor: pointer; background: #182225; color: white; }
       button:disabled { cursor: wait; opacity: 0.6; }
+      .button-row { display: flex; gap: 10px; }
+      .button-row button { flex: 1; }
       .metric { margin: 16px 0 0; font-weight: 700; }
       .scroll { overflow-x: auto; }
       table { width: 100%; margin-top: 16px; border-collapse: collapse; font-size: 0.85rem; }
       th, td { padding: 8px; border-bottom: 1px solid #d2ded8; text-align: left; }
+
+      @media (max-width: 520px) {
+        .analysis-layout { grid-template-columns: 1fr; }
+        .event-log { padding-left: 0; border-left: 0; border-top: 1px solid #b6c7bf; padding-top: 24px; }
+        .button-row { flex-direction: column; gap: 0; }
+      }
     </style>
   </head>
   <body>
     <main>
       <p class="eyebrow">AI Solution Engineering Assignment</p>
-      <h1>Live Sentiment Stream Analyzer</h1>
+      <h1>Live Sentiment Stream Analyzer - Text/Keyboard</h1>
       <p>
         Type a message, inspect model confidence, tune the alert threshold,
         and export the session event log. Inference runs in your browser.
       </p>
       <section class="tool" aria-label="Sentiment analyzer">
-        <label for="text-input">Text to analyze</label>
-        <textarea id="text-input" rows="4" placeholder="Type a message..."></textarea>
-        <label for="threshold">Negative alert threshold: <output id="threshold-value">80</output>%</label>
-        <input id="threshold" type="range" min="50" max="99" value="80" oninput="document.querySelector('#threshold-value').value = this.value">
-        <button id="analyze" type="button">Analyze sentiment</button>
-        <p id="status" role="status">The model downloads on the first analysis.</p>
-        <p class="metric">Result: <span id="result">Waiting for input</span></p>
-        <p class="metric">Scores: <span id="scores">No analysis yet</span></p>
-        <p class="metric" id="alert">No alert</p>
-        <p id="stats">0 analyses | 0 alerts</p>
-        <button id="download" type="button">Download JSON event log</button>
-        <div class="scroll"><table><thead><tr><th>Time</th><th>Text</th><th>Class</th><th>Confidence</th><th>Alert</th></tr></thead><tbody id="log"></tbody></table></div>
+        <div class="analysis-layout">
+          <div class="analysis-controls">
+            <label for="text-input">Text to analyze</label>
+            <textarea id="text-input" rows="4" placeholder="Type a message..."></textarea>
+            <label for="threshold">Negative alert threshold: <output id="threshold-value">80</output>%</label>
+            <input id="threshold" type="range" min="50" max="99" value="80" oninput="document.querySelector('#threshold-value').value = this.value">
+            <div class="button-row">
+              <button id="analyze" type="button">Analyze sentiment</button>
+              <button id="reset" type="button">Reset session</button>
+            </div>
+            <p id="status" role="status">The model downloads on the first analysis.</p>
+            <p class="metric">Result: <span id="result">Waiting for input</span></p>
+            <p class="metric">Scores: <span id="scores">No analysis yet</span></p>
+            <p class="metric" id="alert">No alert</p>
+          </div>
+          <div class="event-log">
+            <p id="stats">0 analyses | 0 alerts</p>
+            <button id="download" type="button">Download JSON event log</button>
+            <div class="scroll"><table><thead><tr><th>Time</th><th>Text</th><th>Class</th><th>Confidence</th><th>Alert</th></tr></thead><tbody id="log"></tbody></table></div>
+          </div>
+        </div>
       </section>
     </main>
   </body>
