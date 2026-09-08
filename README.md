@@ -1,5 +1,5 @@
 ---
-title: Live Vision Object Detector
+title: Live Pointer Movement Analyzer
 emoji: "📈"
 colorFrom: blue
 colorTo: green
@@ -8,9 +8,9 @@ app_file: index.html
 pinned: false
 ---
 
-# Live Vision Object Detector
+# Live Pointer Movement Analyzer
 
-A browser app that captures webcam frames, runs object detection with DETR through Transformers.js, draws bounding boxes and confidence scores, and keeps an exportable detection log.
+A browser app that captures pointer movement, calculates speed and jitter, produces an anomaly score, and keeps an exportable movement log.
 
 ## Live demo URL
 
@@ -22,31 +22,29 @@ The static app runs on GitHub Pages or a free Hugging Face Static Space. The Pyt
 
 ## What this app does
 
-- Requests webcam access and analyzes one captured frame at a time.
-- Uses `Xenova/detr-resnet-50` in the browser through Transformers.js.
-- Draws detected object boxes and confidence labels over the camera frame.
-- Filters detections with a user-controlled minimum confidence.
-- Stores a timestamped detection log and lets users export JSON.
+- Tracks pointer movement after the user clicks Start tracking.
+- Calculates speed and jitter from recent pointer samples.
+- Produces a visible anomaly score with a user-controlled alert threshold.
+- Stores timestamped movement samples and lets users export JSON.
 
 ## Model and data
 
-- Model: `Xenova/detr-resnet-50`
-- Source: Hugging Face model hub
-- Input data: webcam frames only; frames are processed in the browser.
+- Method: browser-side movement feature extraction; no downloaded model is required.
+- Input data: pointer coordinates and timing only; no text, camera, or uploaded dataset.
 
 ## How it works
 
-1. User grants camera permission and starts the webcam.
-2. Transformers.js downloads the DETR model and runs object detection locally in the browser.
-3. Detected objects are drawn with bounding boxes and confidence scores.
-4. The minimum-confidence control filters low-confidence detections.
-5. Detection events are appended to an in-memory log and can be downloaded as JSON.
+1. User clicks Start tracking and moves the pointer.
+2. The browser records coordinate changes and elapsed time between samples.
+3. Average speed and speed-change jitter are combined into an anomaly score.
+4. The threshold control raises an alert when the score is high.
+5. Movement events are appended to an in-memory log and can be downloaded as JSON.
 
 ## Limitations
 
-- Camera permission is required; if access is denied, the UI shows an actionable error.
-- Browser model downloads require network access and may be slow on first use.
-- Detection confidence is not calibrated certainty and small or occluded objects may be missed.
+- This is a lightweight heuristic, not a trained bot-detection model.
+- Trackpads, high-DPI displays, browser throttling, and accessibility tools can affect measurements.
+- Scores are session-relative indicators and are not calibrated probabilities.
 
 ## Local run
 

@@ -3,117 +3,118 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Live Vision Object Detector</title>
+    <title>Live Pointer Movement Analyzer</title>
     <script type="module">
       import { pipeline } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1";
 
-      const modelName = "Xenova/detr-resnet-50";
       const events = [];
-      let detector;
-      let stream;
+      const movement = [];
+      let tracking = false;
+      let lastPoint;
+      let lastSampleTime;
 
       const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", "\"": "&quot;" }[character]));
       const renderLog = () => {
         document.querySelector("#log").innerHTML = events.map((event) =>
-          `<tr><td>${escapeHtml(event.time)}</td><td>${escapeHtml(event.label)}</td><td>${escapeHtml(event.confidence)}%</td></tr>`
+          `<tr><td>${escapeHtml(event.time)}</td><td>${escapeHtml(event.score)}</td><td>${escapeHtml(event.speed)}</td><td>${escapeHtml(event.jitter)}</td><td>${event.alert ? "Yes" : "No"}</td></tr>`
         ).join("");
-        document.querySelector("#stats").textContent = `${events.length} captures | ${events.reduce((total, event) => total + event.count, 0)} detections`;
+        document.querySelector("#stats").textContent = `${events.length} samples | ${events.filter((event) => event.alert).length} alerts`;
       };
 
-      const drawDetections = (detections) => {
-        const video = document.querySelector("#camera");
-        const canvas = document.querySelector("#overlay");
-        const context = canvas.getContext("2d");
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        context.clearRect(0, 0, canvas.width, canvas.height);
-        context.strokeStyle = "#d45b3a";
-        context.fillStyle = "#d45b3a";
-        context.lineWidth = Math.max(2, canvas.width / 320);
-        for (const detection of detections) {
-          const [xmin, ymin, xmax, ymax] = detection.box;
-          context.strokeRect(xmin, ymin, xmax - xmin, ymax - ymin);
-          context.font = `${Math.max(14, canvas.width / 45)}px system-ui`;
-          context.fillText(`${detection.label} ${(detection.score * 100).toFixed(1)}%`, xmin, Math.max(18, ymin - 6));
-        }
+      const startTracking = () => {
+        tracking = true;
+        movement.length = 0;
+        lastPoint = null;
+        lastSampleTime = null;
+        document.querySelector("#start-tracking").disabled = true;
+        document.querySelector("#stop-tracking").disabled = false;
+        document.querySelector("#status").textContent = "Tracking pointer movement. Move the mouse through the analysis area.";
       };
 
-      const startCamera = async () => {
-        const status = document.querySelector("#status");
-        try {
-          stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
-          document.querySelector("#camera").srcObject = stream;
-          status.textContent = "Camera ready. Click Detect objects to analyze a frame.";
-        } catch (error) {
-          status.textContent = `Camera unavailable: ${error.message}. Allow camera access and try again.`;
-        }
+      const stopTracking = () => {
+        tracking = false;
+        lastPoint = null;
+        lastSampleTime = null;
+        document.querySelector("#start-tracking").disabled = false;
+        document.querySelector("#stop-tracking").disabled = true;
+        document.querySelector("#status").textContent = "Pointer tracking stopped.";
       };
 
-      const stopCamera = () => {
-        if (stream) {
-          stream.getTracks().forEach((track) => track.stop());
-          stream = null;
+      const recordMovement = (event) => {
+        if (!tracking) return;
+        const now = performance.now();
+        if (!lastPoint || now - lastSampleTime < 40) {
+          lastPoint = { x: event.clientX, y: event.clientY };
+          lastSampleTime = now;
+          return;
         }
-        document.querySelector("#camera").srcObject = null;
-        const canvas = document.querySelector("#overlay");
-        canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
-        document.querySelector("#status").textContent = "Camera stopped. Start the camera to detect objects.";
+        const distance = Math.hypot(event.clientX - lastPoint.x, event.clientY - lastPoint.y);
+        const seconds = (now - lastSampleTime) / 1000;
+        movement.push({ distance, speed: distance / Math.max(seconds, 0.001) });
+        if (movement.length > 120) movement.shift();
+        lastPoint = { x: event.clientX, y: event.clientY };
+        lastSampleTime = now;
+        updateMetrics();
       };
 
-      const analyze = async () => {
-        const video = document.querySelector("#camera");
-        const threshold = Number(document.querySelector("#threshold").value) / 100;
-        const status = document.querySelector("#status");
-        if (!stream || !video.videoWidth) { status.textContent = "Start the camera before detecting objects."; return; }
-        status.textContent = "Loading the model or analyzing text...";
-        document.querySelector("#analyze").disabled = true;
-        try {
-          detector ||= await pipeline("object-detection", modelName);
-          const detections = (await detector(video, { threshold })).map((detection) => ({ ...detection, score: Number(detection.score) })).slice(0, 12);
-          drawDetections(detections);
-          const summary = detections.length ? detections.map((detection) => `${detection.label} ${(detection.score * 100).toFixed(1)}%`).join(", ") : "No objects above threshold";
-          document.querySelector("#result").textContent = detections.length ? `${detections.length} object(s) detected` : "No objects detected";
-          document.querySelector("#scores").textContent = summary;
-          document.querySelector("#alert").textContent = detections.length ? "Detection complete" : "No detection alert";
-          events.unshift({ time: new Date().toLocaleTimeString(), label: summary, confidence: detections.length ? (Math.max(...detections.map((detection) => detection.score)) * 100).toFixed(2) : "0.00", count: detections.length });
-          renderLog();
-          status.textContent = "Frame analyzed successfully.";
-        } catch (error) {
-          const canvas = document.querySelector("#overlay");
-          canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
-          document.querySelector("#result").textContent = "Model unavailable";
-          document.querySelector("#scores").textContent = "No detections reported";
-          document.querySelector("#alert").textContent = "Camera is ready, but the model weights could not be downloaded.";
-          status.textContent = `Object model unavailable: ${error.message}. The camera works; check network access to Hugging Face model files.`;
+      const updateMetrics = () => {
+        if (!movement.length) return;
+        const threshold = Number(document.querySelector("#threshold").value);
+        const speeds = movement.map((sample) => sample.speed);
+        const averageSpeed = speeds.reduce((sum, speed) => sum + speed, 0) / speeds.length;
+        const averageChange = speeds.length > 1
+          ? speeds.slice(1).reduce((sum, speed, index) => sum + Math.abs(speed - speeds[index]), 0) / (speeds.length - 1)
+          : 0;
+        const jitter = Math.min(100, averageChange / Math.max(averageSpeed, 1) * 100);
+        const score = Math.min(100, Math.max(0, jitter * 0.7 + Math.min(100, averageSpeed / 8) * 0.3));
+        document.querySelector("#result").textContent = `${score.toFixed(1)}% anomaly score`;
+        document.querySelector("#scores").textContent = `Speed: ${averageSpeed.toFixed(1)} px/s | Jitter: ${jitter.toFixed(1)}% | Samples: ${movement.length}`;
+        document.querySelector("#alert").textContent = score >= threshold ? `ALERT: movement score crossed ${threshold}%` : "Movement within expected range";
+      };
+
+      const analyze = () => {
+        if (!movement.length) {
+          document.querySelector("#status").textContent = "Move the pointer while tracking before recording a sample.";
+          return;
         }
-        document.querySelector("#analyze").disabled = false;
+        const scoreText = document.querySelector("#result").textContent.match(/[0-9.]+/);
+        const score = scoreText ? Number(scoreText[0]) : 0;
+        const alert = score >= Number(document.querySelector("#threshold").value);
+        const speeds = movement.map((sample) => sample.speed);
+        const averageSpeed = speeds.reduce((sum, value) => sum + value, 0) / speeds.length;
+        const jitterText = document.querySelector("#scores").textContent.match(/Jitter: ([0-9.]+)/);
+        events.unshift({ time: new Date().toLocaleTimeString(), score: `${score.toFixed(1)}%`, speed: `${averageSpeed.toFixed(1)} px/s`, jitter: `${jitterText ? jitterText[1] : "0.0"}%`, alert });
+        renderLog();
+        document.querySelector("#status").textContent = "Pointer sample recorded.";
+      };
+
+      const resetSession = () => {
+        stopTracking();
+        movement.length = 0;
+        events.length = 0;
+        document.querySelector("#threshold").value = "70";
+        document.querySelector("#threshold-value").value = "70";
+        document.querySelector("#result").textContent = "Waiting for pointer input";
+        document.querySelector("#scores").textContent = "No movement sample yet";
+        document.querySelector("#alert").textContent = "No alert";
+        document.querySelector("#status").textContent = "Session reset. Start tracking to begin.";
+        renderLog();
       };
 
       const download = () => {
         const blob = new Blob([JSON.stringify(events, null, 2)], { type: "application/json" });
         const link = document.createElement("a");
-        link.href = URL.createObjectURL(blob); link.download = "vision-detections.json"; link.click();
+        link.href = URL.createObjectURL(blob); link.download = "pointer-events.json"; link.click();
         URL.revokeObjectURL(link.href);
       };
 
-      const resetSession = () => {
-        events.length = 0;
-        document.querySelector("#threshold").value = "80";
-        document.querySelector("#threshold-value").value = "80";
-        document.querySelector("#result").textContent = "Waiting for input";
-        document.querySelector("#scores").textContent = "No analysis yet";
-        document.querySelector("#alert").textContent = "No alert";
-        document.querySelector("#overlay").getContext("2d").clearRect(0, 0, document.querySelector("#overlay").width, document.querySelector("#overlay").height);
-        document.querySelector("#status").textContent = "Session reset. Start the camera before detecting objects.";
-        renderLog();
-      };
-
       window.addEventListener("DOMContentLoaded", () => {
+        document.querySelector("#start-tracking").addEventListener("click", startTracking);
+        document.querySelector("#stop-tracking").addEventListener("click", stopTracking);
         document.querySelector("#analyze").addEventListener("click", analyze);
-        document.querySelector("#start-camera").addEventListener("click", startCamera);
-        document.querySelector("#stop-camera").addEventListener("click", stopCamera);
-        document.querySelector("#download").addEventListener("click", download);
         document.querySelector("#reset").addEventListener("click", resetSession);
+        document.querySelector("#download").addEventListener("click", download);
+        document.addEventListener("pointermove", recordMovement);
       });
     </script>
     <style>
@@ -187,9 +188,7 @@
 
       .analysis-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 1fr); gap: 24px; align-items: stretch; }
       .event-log { min-width: 0; min-height: 100%; padding-left: 24px; border-left: 1px solid #b6c7bf; }
-      .camera-frame { position: relative; overflow: hidden; margin-top: 8px; aspect-ratio: 4 / 3; background: #182225; border-radius: 4px; }
-      #camera, #overlay { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-      #overlay { pointer-events: none; }
+      .pointer-pad { display: grid; place-items: center; min-height: 280px; margin-top: 8px; border: 1px dashed #91a8a0; border-radius: 4px; background: #e7f0eb; color: #53655f; text-align: center; }
 
       textarea, input, button {
         box-sizing: border-box;
@@ -220,32 +219,32 @@
   <body>
     <main>
         <p class="eyebrow">AI Solution Engineering Assignment</p>
-        <h1>Live Vision Object Detector</h1>
+        <h1>Live Pointer Movement Analyzer</h1>
       <p>
-          Use your webcam to detect objects, inspect confidence scores,
-          and keep a timestamped detection log. Inference runs in your browser.
+          Track pointer speed and jitter, inspect an anomaly score,
+          and keep a timestamped movement log. Analysis runs in your browser.
       </p>
-      <section class="tool" aria-label="Webcam object detector">
+      <section class="tool" aria-label="Pointer movement analyzer">
         <div class="analysis-layout">
           <div class="analysis-controls">
-            <div class="camera-frame"><video id="camera" autoplay muted playsinline></video><canvas id="overlay"></canvas></div>
+            <div class="pointer-pad">Move your pointer through this page while tracking is active.</div>
             <div class="button-row">
-              <button id="start-camera" type="button">Start camera</button>
-              <button id="stop-camera" type="button">Stop camera</button>
-              <button id="analyze" type="button">Detect objects</button>
+              <button id="start-tracking" type="button">Start tracking</button>
+              <button id="stop-tracking" type="button" disabled>Stop tracking</button>
+              <button id="analyze" type="button">Record sample</button>
               <button id="reset" type="button">Reset session</button>
             </div>
-            <label for="threshold">Minimum confidence: <output id="threshold-value">80</output>%</label>
-            <input id="threshold" type="range" min="50" max="99" value="80" oninput="document.querySelector('#threshold-value').value = this.value">
-            <p id="status" role="status">Start the camera, then detect objects in a frame.</p>
-            <p class="metric">Result: <span id="result">Waiting for input</span></p>
-            <p class="metric">Detections: <span id="scores">No analysis yet</span></p>
-            <p class="metric" id="alert">No detection yet</p>
+            <label for="threshold">Anomaly alert threshold: <output id="threshold-value">70</output>%</label>
+            <input id="threshold" type="range" min="50" max="99" value="70" oninput="document.querySelector('#threshold-value').value = this.value">
+            <p id="status" role="status">Start tracking to begin collecting pointer movement.</p>
+            <p class="metric">Result: <span id="result">Waiting for pointer input</span></p>
+            <p class="metric">Metrics: <span id="scores">No movement sample yet</span></p>
+            <p class="metric" id="alert">No alert</p>
           </div>
           <div class="event-log">
-            <p id="stats">0 captures | 0 detections</p>
-            <button id="download" type="button">Download JSON event log</button>
-            <div class="scroll"><table><thead><tr><th>Time</th><th>Objects</th><th>Top confidence</th></tr></thead><tbody id="log"></tbody></table></div>
+            <p id="stats">0 samples | 0 alerts</p>
+            <button id="download" type="button">Download JSON movement log</button>
+            <div class="scroll"><table><thead><tr><th>Time</th><th>Anomaly score</th><th>Speed</th><th>Jitter</th><th>Alert</th></tr></thead><tbody id="log"></tbody></table></div>
           </div>
         </div>
       </section>
