@@ -70,7 +70,6 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           HF_SPACE_ID: ${{ vars.HF_SPACE_ID }}
-          HF_USERNAME: Deqmin
         run: |
-          git remote add space "https://${HF_USERNAME}:${HF_TOKEN}@huggingface.co/spaces/${HF_USERNAME}/${HF_SPACE_ID}" || true
+          git remote add space "https://${HF_USERNAME}:${HF_TOKEN}@huggingface.co/spaces/${HF_SPACE_ID}" || true
           git push --force space HEAD:main
