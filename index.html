@@ -11,11 +11,23 @@
       const events = [];
       let classifier;
 
+      const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", "\"": "&quot;" }[character]));
       const renderLog = () => {
         document.querySelector("#log").innerHTML = events.map((event) =>
-          `<tr><td>${event.time}</td><td>${event.text}</td><td>${event.label}</td><td>${event.confidence}%</td><td>${event.alert ? "Yes" : "No"}</td></tr>`
+          `<tr><td>${escapeHtml(event.time)}</td><td>${escapeHtml(event.text)}</td><td>${escapeHtml(event.label)}</td><td>${escapeHtml(event.confidence)}%</td><td>${event.alert ? "Yes" : "No"}</td></tr>`
         ).join("");
         document.querySelector("#stats").textContent = `${events.length} analyses | ${events.filter((event) => event.alert).length} alerts`;
+      };
+
+      const fallbackSentiment = (text) => {
+        const positiveWords = ["good", "great", "happy", "love", "excellent", "amazing", "like"];
+        const negativeWords = ["bad", "hate", "sad", "angry", "terrible", "awful", "poor"];
+        const words = text.toLowerCase().match(/[a-z]+/g) || [];
+        const positive = words.filter((word) => positiveWords.includes(word)).length;
+        const negative = words.filter((word) => negativeWords.includes(word)).length;
+        const label = negative > positive ? "Negative" : "Positive";
+        const confidence = Math.min(99, 50 + Math.abs(positive - negative) * 12);
+        return { label, confidence: confidence.toFixed(2), scores: `POSITIVE: ${label === "Positive" ? confidence : 100 - confidence}% | NEGATIVE: ${label === "Negative" ? confidence : 100 - confidence}%` };
       };
 
       const analyze = async () => {
@@ -39,7 +51,16 @@
           events.unshift({ time: new Date().toLocaleTimeString(), text: text.slice(0, 120), label, confidence, alert });
           renderLog();
           status.textContent = "Analysis complete.";
-        } catch (error) { status.textContent = `Unable to analyze this text: ${error.message}`; }
+        } catch (error) {
+          const fallback = fallbackSentiment(text);
+          const alert = fallback.label === "Negative" && Number(fallback.confidence) >= threshold;
+          document.querySelector("#result").textContent = `${fallback.label} (${fallback.confidence}%, local fallback)`;
+          document.querySelector("#scores").textContent = fallback.scores;
+          document.querySelector("#alert").textContent = alert ? `ALERT: negative confidence crossed ${threshold}%` : "No alert";
+          events.unshift({ time: new Date().toLocaleTimeString(), text: text.slice(0, 120), label: fallback.label, confidence: fallback.confidence, alert });
+          renderLog();
+          status.textContent = "Model weights could not be fetched; showing a local keyword fallback.";
+        }
         document.querySelector("#analyze").disabled = false;
       };
 
