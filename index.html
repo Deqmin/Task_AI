@@ -49,6 +49,17 @@
         }
       };
 
+      const stopCamera = () => {
+        if (stream) {
+          stream.getTracks().forEach((track) => track.stop());
+          stream = null;
+        }
+        document.querySelector("#camera").srcObject = null;
+        const canvas = document.querySelector("#overlay");
+        canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
+        document.querySelector("#status").textContent = "Camera stopped. Start the camera to detect objects.";
+      };
+
       const analyze = async () => {
         const video = document.querySelector("#camera");
         const threshold = Number(document.querySelector("#threshold").value) / 100;
@@ -68,7 +79,12 @@
           renderLog();
           status.textContent = "Frame analyzed successfully.";
         } catch (error) {
-          status.textContent = `Object model unavailable: ${error.message}. Check network access to the model files.`;
+          const canvas = document.querySelector("#overlay");
+          canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
+          document.querySelector("#result").textContent = "Model unavailable";
+          document.querySelector("#scores").textContent = "No detections reported";
+          document.querySelector("#alert").textContent = "Camera is ready, but the model weights could not be downloaded.";
+          status.textContent = `Object model unavailable: ${error.message}. The camera works; check network access to Hugging Face model files.`;
         }
         document.querySelector("#analyze").disabled = false;
       };
@@ -95,6 +111,7 @@
       window.addEventListener("DOMContentLoaded", () => {
         document.querySelector("#analyze").addEventListener("click", analyze);
         document.querySelector("#start-camera").addEventListener("click", startCamera);
+        document.querySelector("#stop-camera").addEventListener("click", stopCamera);
         document.querySelector("#download").addEventListener("click", download);
         document.querySelector("#reset").addEventListener("click", resetSession);
       });
@@ -214,6 +231,7 @@
             <div class="camera-frame"><video id="camera" autoplay muted playsinline></video><canvas id="overlay"></canvas></div>
             <div class="button-row">
               <button id="start-camera" type="button">Start camera</button>
+              <button id="stop-camera" type="button">Stop camera</button>
               <button id="analyze" type="button">Detect objects</button>
               <button id="reset" type="button">Reset session</button>
             </div>
