@@ -1,29 +1,29 @@
 ---
 title: Live Sentiment Stream Analyzer
-emoji: chart_with_upwards_trend
+emoji: "📈"
 colorFrom: blue
 colorTo: green
-sdk: gradio
-app_file: app.py
+sdk: static
+app_file: index.html
 pinned: false
 ---
 
 # Live Sentiment Stream Analyzer
 
-A Gradio app that takes typed text input, runs sentiment classification in Python on each Analyze click, and shows confidence scores, alerts, and an exportable event log.
+A browser app that takes typed text input, runs the DistilBERT sentiment model with Transformers.js, and shows confidence scores, alerts, and an exportable event log.
 
 ## Live demo URL
 
 Set this after creating the Space:
-- Hugging Face Space: https://huggingface.co/spaces/<your-username>/<your-space-name>
+- Hugging Face Space: https://huggingface.co/spaces/deqmin/live-sentiment-stream-analyzer
 - GitHub Pages project page: https://deqmin.github.io/Task_AI/
 
-GitHub Pages hosts the static project landing page. The Python Gradio model demo runs on Hugging Face Spaces.
+The static app runs on GitHub Pages or a free Hugging Face Static Space. The Python implementation remains available for local CI verification.
 
 ## What this app does
 
 - Accepts text input from the user and analyzes each submitted sample.
-- Uses a Hugging Face Transformers sentiment model to classify text as Positive or Negative.
+- Uses the DistilBERT sentiment model in the browser through Transformers.js.
 - Displays confidence scores for each class.
 - Triggers a visible alert when confidence crosses a user-defined threshold.
 - Stores a session event log with timestamps and lets users export CSV/JSON.
@@ -37,7 +37,7 @@ GitHub Pages hosts the static project landing page. The Python Gradio model demo
 ## How it works
 
 1. User enters text in the UI.
-2. Python backend runs a Transformers text-classification pipeline.
+2. Transformers.js downloads the tokenizer and model in the browser and runs text classification locally.
 3. App sorts class probabilities and shows top class + confidence.
 4. If confidence is above threshold (and matches target class), an alert banner appears.
 5. Analysis events are appended to an in-memory session log and can be downloaded as CSV/JSON.
@@ -73,7 +73,7 @@ Then open the local Gradio URL shown in terminal.
 
 ## CI/CD setup
 
-The workflow file [`.github/workflows/deploy-huggingface.yml`](.github/workflows/deploy-huggingface.yml) includes:
+The workflow file [`.github/workflows/deploy-huggingface.yml`](.github/workflows/deploy-huggingface.yml) verifies the Python implementation and deploys the static app to a free Hugging Face Space.
 - Verify job: required file checks, clean install, import checks, application smoke import, and Python compilation.
 - Deploy job: pushes `main` to Hugging Face Space after verify passes.
 

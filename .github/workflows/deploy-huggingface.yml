@@ -66,7 +66,7 @@ jobs:
             exit 1
           fi
 
-      - name: Push to Hugging Face Space
+      - name: Push to Hugging Face Static Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           HF_SPACE_ID: ${{ vars.HF_SPACE_ID }}
@@ -76,5 +76,5 @@ jobs:
             exit 1
           fi
 
-          git remote add space "https://oauth2:${HF_TOKEN}@huggingface.co/${HF_SPACE_ID}"
-          git push --force space HEAD:main 
+          git remote add space "https://oauth2:${HF_TOKEN}@huggingface.co/spaces/${HF_SPACE_ID}"
+          git push --force space HEAD:main

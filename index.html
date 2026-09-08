@@ -4,6 +4,57 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Live Sentiment Stream Analyzer</title>
+    <script type="module">
+      import { pipeline } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1";
+
+      const modelName = "Xenova/distilbert-base-uncased-finetuned-sst-2-english";
+      const events = [];
+      let classifier;
+
+      const renderLog = () => {
+        document.querySelector("#log").innerHTML = events.map((event) =>
+          `<tr><td>${event.time}</td><td>${event.text}</td><td>${event.label}</td><td>${event.confidence}%</td><td>${event.alert ? "Yes" : "No"}</td></tr>`
+        ).join("");
+        document.querySelector("#stats").textContent = `${events.length} analyses | ${events.filter((event) => event.alert).length} alerts`;
+      };
+
+      const analyze = async () => {
+        const text = document.querySelector("#text-input").value.trim();
+        const threshold = Number(document.querySelector("#threshold").value);
+        const status = document.querySelector("#status");
+        if (!text) { status.textContent = "Enter text before analyzing."; return; }
+        status.textContent = "Loading the model or analyzing text...";
+        document.querySelector("#analyze").disabled = true;
+        try {
+          classifier ||= await pipeline("sentiment-analysis", modelName);
+          const scores = await classifier(text, { top_k: null });
+          const sorted = [...scores].sort((left, right) => right.score - left.score);
+          const top = sorted[0];
+          const label = top.label === "POSITIVE" ? "Positive" : "Negative";
+          const confidence = (top.score * 100).toFixed(2);
+          const alert = label === "Negative" && Number(confidence) >= threshold;
+          document.querySelector("#result").textContent = `${label} (${confidence}%)`;
+          document.querySelector("#scores").textContent = sorted.map((score) => `${score.label}: ${(score.score * 100).toFixed(2)}%`).join(" | ");
+          document.querySelector("#alert").textContent = alert ? `ALERT: negative confidence crossed ${threshold}%` : "No alert";
+          events.unshift({ time: new Date().toLocaleTimeString(), text: text.slice(0, 120), label, confidence, alert });
+          renderLog();
+          status.textContent = "Analysis complete.";
+        } catch (error) { status.textContent = `Unable to analyze this text: ${error.message}`; }
+        document.querySelector("#analyze").disabled = false;
+      };
+
+      const download = () => {
+        const blob = new Blob([JSON.stringify(events, null, 2)], { type: "application/json" });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob); link.download = "sentiment-events.json"; link.click();
+        URL.revokeObjectURL(link.href);
+      };
+
+      window.addEventListener("DOMContentLoaded", () => {
+        document.querySelector("#analyze").addEventListener("click", analyze);
+        document.querySelector("#download").addEventListener("click", download);
+      });
+    </script>
     <style>
       :root {
         color-scheme: light;
@@ -63,6 +114,32 @@
       a:focus-visible {
         background: #b24c32;
       }
+
+      .tool {
+        margin-top: 30px;
+        padding: 24px;
+        border: 1px solid #b6c7bf;
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.72);
+        font-family: system-ui, sans-serif;
+      }
+
+      textarea, input, button {
+        box-sizing: border-box;
+        width: 100%;
+        margin-top: 8px;
+        padding: 12px;
+        border: 1px solid #91a8a0;
+        border-radius: 4px;
+        font: inherit;
+      }
+
+      button { cursor: pointer; background: #182225; color: white; }
+      button:disabled { cursor: wait; opacity: 0.6; }
+      .metric { margin: 16px 0 0; font-weight: 700; }
+      .scroll { overflow-x: auto; }
+      table { width: 100%; margin-top: 16px; border-collapse: collapse; font-size: 0.85rem; }
+      th, td { padding: 8px; border-bottom: 1px solid #d2ded8; text-align: left; }
     </style>
   </head>
   <body>
@@ -71,11 +148,22 @@
       <h1>Live Sentiment Stream Analyzer</h1>
       <p>
         Type a message, inspect the model confidence, tune the alert threshold,
-        and export the session event log. The Python demo runs on Hugging Face Spaces.
-      </p>
+        Type a message, inspect model confidence, tune the alert threshold,
+        and export the session event log. Inference runs in your browser.
       <a href="https://huggingface.co/deqmin/live-sentiment-stream-analyzer">
-        Open the live analyzer
-      </a>
-    </main>
+      <section class="tool" aria-label="Sentiment analyzer">
+        <label for="text-input">Text to analyze</label>
+        <textarea id="text-input" rows="4" placeholder="Type a message..."></textarea>
+        <label for="threshold">Negative alert threshold: <output id="threshold-value">80</output>%</label>
+        <input id="threshold" type="range" min="50" max="99" value="80" oninput="document.querySelector('#threshold-value').value = this.value">
+        <button id="analyze" type="button">Analyze sentiment</button>
+        <p id="status" role="status">The model downloads on the first analysis.</p>
+        <p class="metric">Result: <span id="result">Waiting for input</span></p>
+        <p class="metric">Scores: <span id="scores">No analysis yet</span></p>
+        <p class="metric" id="alert">No alert</p>
+        <p id="stats">0 analyses | 0 alerts</p>
+        <button id="download" type="button">Download JSON event log</button>
+        <div class="scroll"><table><thead><tr><th>Time</th><th>Text</th><th>Class</th><th>Confidence</th><th>Alert</th></tr></thead><tbody id="log"></tbody></table></div>
+      </section>
   </body>
 </html>
