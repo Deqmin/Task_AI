@@ -147,10 +147,9 @@
       <p class="eyebrow">AI Solution Engineering Assignment</p>
       <h1>Live Sentiment Stream Analyzer</h1>
       <p>
-        Type a message, inspect the model confidence, tune the alert threshold,
         Type a message, inspect model confidence, tune the alert threshold,
         and export the session event log. Inference runs in your browser.
-      <a href="https://huggingface.co/deqmin/live-sentiment-stream-analyzer">
+      </p>
       <section class="tool" aria-label="Sentiment analyzer">
         <label for="text-input">Text to analyze</label>
         <textarea id="text-input" rows="4" placeholder="Type a message..."></textarea>
@@ -165,5 +164,6 @@
         <button id="download" type="button">Download JSON event log</button>
         <div class="scroll"><table><thead><tr><th>Time</th><th>Text</th><th>Class</th><th>Confidence</th><th>Alert</th></tr></thead><tbody id="log"></tbody></table></div>
       </section>
+    </main>
   </body>
 </html>
