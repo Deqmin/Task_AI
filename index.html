@@ -136,6 +136,9 @@
         font-weight: 500;
       }
 
+      .title-row { display: flex; align-items: center; gap: 16px; }
+      .title-image { width: clamp(56px, 8vw, 96px); height: clamp(56px, 8vw, 96px); object-fit: cover; border-radius: 8px; flex: 0 0 auto; }
+
       p {
         max-width: 560px;
         margin: 24px 0 0;
@@ -204,7 +207,10 @@
   <body>
     <main>
         <p class="eyebrow">AI Solution Engineering Assignment</p>
-        <h1>Live Pointer Movement Analyzer</h1>
+        <div class="title-row">
+          <img class="title-image" src="pointer-image.png" alt="Pointer movement visualization">
+          <h1>Live Pointer Movement Analyzer</h1>
+        </div>
       <p>
           Track pointer speed and jitter, inspect an anomaly score,
           and keep a timestamped movement log. Analysis runs in your browser.
