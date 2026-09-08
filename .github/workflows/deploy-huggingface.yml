@@ -40,6 +40,9 @@ jobs:
       - name: Verify imports
         run: python scripts/verify_imports.py
 
+      - name: Smoke-import application
+        run: python -c "import app"
+
       - name: Compile Python files
         run: python -m compileall -q app.py scripts
 
@@ -55,8 +58,10 @@ jobs:
           fetch-depth: 0
 
       - name: Validate Hugging Face target
+        env:
+          HF_SPACE_ID: ${{ vars.HF_SPACE_ID }}
         run: |
-          if [ -z "${{ vars.HF_SPACE_ID }}" ]; then
+          if [[ ! "$HF_SPACE_ID" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
             echo "Repository variable HF_SPACE_ID is required (example: your-hf-user/your-space-name)."
             exit 1
           fi
@@ -71,8 +76,8 @@ jobs:
             exit 1
           fi
 
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git config user.name "github-actions[bot]"
+          git config user.email "deqmin@gmail.com"
+          git config user.name "deqmin"
 
           git remote add hf "https://oauth2:${HF_TOKEN}@huggingface.co/spaces/${HF_SPACE_ID}"
           git push --force hf HEAD:main

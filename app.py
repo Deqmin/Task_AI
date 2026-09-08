@@ -15,12 +15,18 @@ LABEL_MAP = {
     "POSITIVE": "Positive",
     "NEGATIVE": "Negative",
 }
+classifier = None
 
-classifier = pipeline(
-    task="text-classification",
-    model=MODEL_NAME,
-    return_all_scores=True,
-)
+
+def _get_classifier() -> Any:
+    global classifier
+    if classifier is None:
+        classifier = pipeline(
+            task="text-classification",
+            model=MODEL_NAME,
+            return_all_scores=True,
+        )
+    return classifier
 
 
 def _utc_timestamp() -> str:
@@ -77,10 +83,10 @@ def _stats_markdown(log_events: list[dict[str, Any]]) -> str:
     avg_conf = sum(float(event["confidence"]) for event in log_events) / total
 
     return (
-        "**Session stats**\\n"
-        f"- Total analyses: {total}\\n"
-        f"- Positive: {positives} | Negative: {negatives}\\n"
-        f"- Alerts triggered: {alerts}\\n"
+        "**Session stats**\n"
+        f"- Total analyses: {total}\n"
+        f"- Positive: {positives} | Negative: {negatives}\n"
+        f"- Alerts triggered: {alerts}\n"
         f"- Average confidence: {avg_conf:.2f}%"
     )
 
@@ -126,32 +132,28 @@ def analyze_text(
             events,
         )
 
-    raw_scores = classifier(cleaned, truncation=True)
+    raw_scores = _get_classifier()(cleaned, truncation=True)
     scores = _normalize_scores(raw_scores)
-
     top_label = str(scores[0]["label"])
-    top_score = float(scores[0]["score"])
-    confidence_pct = round(top_score * 100.0, 2)
-
+    confidence_pct = round(float(scores[0]["score"]) * 100.0, 2)
     alert_hit = confidence_pct >= threshold * 100.0 and (
         alert_target == "Any" or alert_target == top_label
     )
-
     alert_message = (
         f"### ALERT: {top_label} confidence {confidence_pct:.2f}% crossed threshold"
         if alert_hit
         else "No alert. Confidence is below threshold or outside the selected target class."
     )
 
-    event = {
-        "timestamp": _utc_timestamp(),
-        "text": cleaned[:120],
-        "label": top_label,
-        "confidence": confidence_pct,
-        "alert": alert_hit,
-    }
-    events.append(event)
-
+    events.append(
+        {
+            "timestamp": _utc_timestamp(),
+            "text": cleaned[:120],
+            "label": top_label,
+            "confidence": confidence_pct,
+            "alert": alert_hit,
+        }
+    )
     score_rows = [[item["label"], round(float(item["score"]) * 100.0, 2)] for item in scores]
     log_rows = [
         [
@@ -163,7 +165,6 @@ def analyze_text(
         ]
         for item in events
     ]
-
     csv_file, json_file = _build_export_files(events)
 
     return (
@@ -209,18 +210,15 @@ with gr.Blocks(title="Live Sentiment Stream Analyzer") as demo:
     gr.Markdown(
         """
         # Live Sentiment Stream Analyzer
-        Enter text from any live source (keyboard, copied chat, call notes) and get model sentiment scores instantly.
+        Enter text from any live source and get model sentiment scores on each analysis.
         """
     )
-
     state = gr.State([])
-
-    with gr.Row():
-        text_input = gr.Textbox(
-            label="Live text input",
-            lines=4,
-            placeholder="Type text here, then click Analyze",
-        )
+    text_input = gr.Textbox(
+        label="Live text input",
+        lines=4,
+        placeholder="Type text here, then click Analyze",
+    )
 
     with gr.Row():
         threshold_slider = gr.Slider(
@@ -235,11 +233,9 @@ with gr.Blocks(title="Live Sentiment Stream Analyzer") as demo:
             value="Negative",
             label="Alert when predicted class is",
         )
-
     with gr.Row():
         analyze_button = gr.Button("Analyze", variant="primary")
         clear_button = gr.Button("Clear Session")
-
     with gr.Row():
         label_output = gr.Textbox(label="Top class")
         confidence_output = gr.Number(label="Top confidence (%)", precision=2)
@@ -251,17 +247,13 @@ with gr.Blocks(title="Live Sentiment Stream Analyzer") as demo:
         col_count=(2, "fixed"),
         label="Model scores",
     )
-
     alert_output = gr.Markdown("No alert yet.")
-
     log_table = gr.Dataframe(
         headers=["Timestamp", "Text sample", "Class", "Confidence (%)", "Alert"],
         datatype=["str", "str", "str", "number", "str"],
         label="Event log",
     )
-
     stats_output = gr.Markdown("**Session stats:** no events yet.")
-
     with gr.Row():
         csv_download = gr.File(label="Download CSV log")
         json_download = gr.File(label="Download JSON log")
@@ -291,7 +283,6 @@ with gr.Blocks(title="Live Sentiment Stream Analyzer") as demo:
             state,
         ],
     )
-
     clear_button.click(
         fn=clear_session,
         inputs=[],

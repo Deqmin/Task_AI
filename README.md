@@ -10,16 +10,16 @@ pinned: false
 
 # Live Sentiment Stream Analyzer
 
-A Gradio app that takes live typed text input, runs sentiment classification in Python, and shows confidence scores, alerts, and an exportable event log.
+A Gradio app that takes typed text input, runs sentiment classification in Python on each Analyze click, and shows confidence scores, alerts, and an exportable event log.
 
 ## Live demo URL
 
-Update this after deployment:
+Set this after creating the Space:
 - Hugging Face Space: https://huggingface.co/spaces/<your-username>/<your-space-name>
 
 ## What this app does
 
-- Accepts live text input from the user.
+- Accepts text input from the user and analyzes each submitted sample.
 - Uses a Hugging Face Transformers sentiment model to classify text as Positive or Negative.
 - Displays confidence scores for each class.
 - Triggers a visible alert when confidence crosses a user-defined threshold.
@@ -47,9 +47,21 @@ Update this after deployment:
 
 ## Local run
 
+On Windows PowerShell:
+
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+python scripts\verify_imports.py
+python app.py
+```
+
+On macOS/Linux:
+
 ```bash
 python -m venv .venv
-source .venv/bin/activate  # On Windows PowerShell: .venv\Scripts\Activate.ps1
+source .venv/bin/activate
 pip install -r requirements.txt
 python app.py
 ```
@@ -59,7 +71,7 @@ Then open the local Gradio URL shown in terminal.
 ## CI/CD setup
 
 The workflow file [`.github/workflows/deploy-huggingface.yml`](.github/workflows/deploy-huggingface.yml) includes:
-- Verify job: required file checks, clean install, import checks, Python compilation.
+- Verify job: required file checks, clean install, import checks, application smoke import, and Python compilation.
 - Deploy job: pushes `main` to Hugging Face Space after verify passes.
 
 ### Required GitHub configuration
@@ -75,4 +87,4 @@ The workflow file [`.github/workflows/deploy-huggingface.yml`](.github/workflows
 
 ## Evidence of CI failure and fix
 
-For submission, include one screenshot/link of a failed workflow run and the follow-up passing run after your fix.
+After the first deployment, add one screenshot/link of a failed workflow run and the follow-up passing run after your fix. This evidence is intentionally kept as a release step because workflow run URLs do not exist until this repository is connected to GitHub.
